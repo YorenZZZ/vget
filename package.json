@@ -1,0 +1,37 @@
+{
+  "name": "vget",
+  "version": "1.0.0",
+  "description": "全平台无水印视频下载工具（抖音/B站/YouTube/TikTok）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "YorenZZZ",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "40.10.2",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.vget.app",
+    "productName": "VGET",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "VGET.icns"
+    ],
+    "mac": {
+      "icon": "VGET.icns",
+      "category": "public.app-category.utilities",
+      "target": [
+        "dir"
+      ]
+    }
+  }
+}
