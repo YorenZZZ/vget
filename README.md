@@ -40,6 +40,47 @@ brew install yt-dlp ffmpeg
 
 ## 桌面应用
 
+### 一键安装（推荐）
+
+不想每次用命令行启动？执行一次下面的命令，VGET 就会像普通 App 一样出现在「应用程序」和 Dock 里，以后直接点图标打开：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YorenZZZ/vget/main/install.sh | bash
+```
+
+已经 clone 了仓库的话，在仓库目录里执行：
+
+```bash
+bash install.sh
+```
+
+脚本会自动完成：
+
+1. 检查依赖：缺少 Node.js / yt-dlp / ffmpeg 时通过 Homebrew 安装（没有 Homebrew 会提示你先装）
+2. 下载源码（curl 方式，存放在 `~/.vget`）
+3. 安装 Electron 等 npm 依赖
+4. 构建 `VGET.app` 并安装到 `/Applications`（没有写权限时改装到 `~/Applications`）
+5. 固定到 Dock 并打开应用
+
+可选参数：
+
+| 参数 / 环境变量 | 作用 |
+| --- | --- |
+| `--no-dock` | 不固定到 Dock |
+| `--no-open` | 安装后不自动打开 |
+| `VGET_INSTALL_DIR=路径` | 自定义安装目录 |
+| `VGET_SRC=路径` | 自定义源码存放目录（curl 方式） |
+
+curl 方式传参写法：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YorenZZZ/vget/main/install.sh | bash -s -- --no-dock
+```
+
+**更新**：重新执行一次安装命令即可，会覆盖为最新版本（设置和 cookies 不受影响）。
+
+**卸载**：在 Dock 图标上右键 →「选项」→「从程序坞中移除」，然后把「应用程序」里的 VGET 拖到废纸篓；如需彻底清理，再删除 `~/.vget` 和 `~/Library/Application Support/vget`。
+
 ### 开发运行
 
 ```bash
@@ -49,19 +90,7 @@ npm install
 npm start
 ```
 
-### 构建安装到「应用程序」
-
-```bash
-bash build.sh
-```
-
-脚本会停止正在运行的 VGET、用本地 Electron 组装 `VGET.app`、ad-hoc 签名，并部署到 `/Applications/VGET.app`（旧版本会移到 `/tmp` 而不是直接删除）。
-
-也可以使用 electron-builder：
-
-```bash
-npm run dist
-```
+改完代码后执行 `bash build.sh`，即可重新构建并覆盖安装到 `/Applications/VGET.app`（旧版本会移到 `/tmp` 而不是直接删除）。
 
 ### 使用
 
@@ -118,7 +147,8 @@ B站/YouTube/TikTok 通常需要登录态。任选一种方式导出 Netscape �
 ├── renderer/
 │   └── index.html     # 界面（Material 3 深色主题）
 ├── vget.py            # 独立命令行版本
-├── build.sh           # 一键构建 + 部署到 /Applications
+├── install.sh         # 一键安装：依赖 → 构建 → 应用程序 → Dock
+├── build.sh           # 构建 VGET.app 并部署（开发时使用）
 ├── VGET.icns          # 应用图标
 └── package.json
 ```
@@ -130,6 +160,13 @@ B站/YouTube/TikTok 通常需要登录态。任选一种方式导出 Netscape �
 **提示找不到 yt-dlp？** 执行 `brew install yt-dlp`。VGET 会依次查找 `/opt/homebrew/bin`、`/usr/local/bin` 和 `PATH`。
 
 **抖音解析失败？** 视频可能已删除或设为私密；也可能是接口临时不可用，稍后重试。
+
+**安装时 Electron 下载很慢或失败？** 可以使用镜像后重新执行安装命令：
+
+```bash
+export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+curl -fsSL https://raw.githubusercontent.com/YorenZZZ/vget/main/install.sh | bash
+```
 
 **下载的 B站/YouTube 视频没有声音或是分开的两个文件？** 安装 ffmpeg 以便 yt-dlp 合并音视频。
 
