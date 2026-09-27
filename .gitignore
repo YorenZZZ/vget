@@ -1,0 +1,12 @@
+# 依赖与构建产物
+node_modules/
+dist/
+__pycache__/
+*.pyc
+
+# 个人凭据 —— 切勿提交
+cookies.txt
+*.cookies.txt
+
+# 系统文件
+.DS_Store
