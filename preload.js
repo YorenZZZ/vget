@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld('vget', {
   setConfig: (cfg) => ipcRenderer.invoke('config:set', cfg),
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),
   selectFile: () => ipcRenderer.invoke('dialog:selectFile'),
+  importCookies: (target) => ipcRenderer.invoke('cookies:import', target),
+  cookiesInfo: (target) => ipcRenderer.invoke('cookies:info', target),
   onTaskProgress: (cb) => ipcRenderer.on('task:progress', (_e, data) => cb(data)),
 })

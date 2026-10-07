@@ -23,7 +23,7 @@ for arg in "$@"; do
   case "$arg" in
     --no-dock) ADD_DOCK=0 ;;
     --no-open) OPEN_APP=0 ;;
-    *) echo "未知参数：$arg（可用：--no-dock --no-open）"; exit 1 ;;
+    *) echo "未知参数：${arg}（可用：--no-dock --no-open）"; exit 1 ;;
   esac
 done
 
@@ -54,7 +54,7 @@ for tool in yt-dlp ffmpeg; do
       info "安装 $tool"
       brew install "$tool"
     else
-      warn "未找到 $tool，B站/YouTube/TikTok 下载将不可用（安装 Homebrew 后执行 brew install $tool）"
+      warn "未找到 ${tool}，B站/YouTube/TikTok 下载将不可用（安装 Homebrew 后执行 brew install ${tool}）"
     fi
   fi
 done
@@ -69,7 +69,7 @@ fi
 if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/main.js" ]; then
   SRC="$SCRIPT_DIR"
 else
-  # 通过 curl 执行：下载最新源码到 $SRC_DIR（保留已下载的 node_modules，加快重装）
+  # 通过 curl 执行：下载最新源码到 ${SRC_DIR}（保留已下载的 node_modules，加快重装）
   SRC="$SRC_DIR"
   TMP="$(mktemp -d)"
   curl -fsSL "$REPO_TARBALL" | tar -xz -C "$TMP"
@@ -102,7 +102,7 @@ APP_PATH="$INSTALL_DIR/$APP_NAME.app"
 # ---------- 5. Dock ----------
 if [ "$ADD_DOCK" = 1 ]; then
   if defaults read com.apple.dock persistent-apps 2>/dev/null | grep -q "$APP_PATH/"; then
-    info "5/5 Dock 中已有 $APP_NAME，跳过"
+    info "5/5 Dock 中已有 ${APP_NAME}，跳过"
   else
     info "5/5 固定到 Dock"
     defaults write com.apple.dock persistent-apps -array-add \
@@ -116,5 +116,5 @@ fi
 [ "$OPEN_APP" = 1 ] && open "$APP_PATH"
 
 echo
-echo "🎉 安装完成！以后可以从 Dock、启动台或「应用程序」文件夹打开 $APP_NAME。"
+echo "🎉 安装完成！以后可以从 Dock、启动台或「应用程序」文件夹打开 ${APP_NAME}。"
 echo "   更新：重新运行一次本脚本即可。"

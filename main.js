@@ -28,6 +28,77 @@ function saveConfig(cfg) {
   try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2)) } catch { /* 写入失败时忽略，下次仍用默认配置 */ }
 }
 
+// ---------- Cookies ----------
+// YouTube 登录态的关键 cookie：只剩 __Secure-3PSID 之类时，YouTube 仍按未登录处理
+const YT_LOGIN_COOKIES = new Set(['LOGIN_INFO', 'SID', '__Secure-1PSID'])
+
+function expandHome(p) {
+  return p && p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : p
+}
+
+// 按 yt-dlp 的规则统计 Netscape 格式 cookies：每条 7 个 tab 分隔字段，#HttpOnly_ 前缀不算注释
+function inspectCookies(text) {
+  let count = 0
+  let youtubeLogin = false
+  for (const raw of text.split('\n')) {
+    const line = raw.startsWith('#HttpOnly_') ? raw.slice('#HttpOnly_'.length) : raw
+    if (line.startsWith('#') || !line.trim()) continue
+    const f = line.split('\t')
+    if (f.length !== 7) continue
+    count++
+    if (/(^|\.)youtube\.com$/i.test(f[0]) && YT_LOGIN_COOKIES.has(f[5])) youtubeLogin = true
+  }
+  return { count, youtubeLogin }
+}
+
+function cookiesInfo(target) {
+  const file = expandHome(target)
+  if (!file || !fs.existsSync(file)) return { exists: false }
+  try {
+    return { exists: true, ...inspectCookies(fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n')) }
+  } catch {
+    return { exists: false }
+  }
+}
+
+// 选择 cookies 文件，校验后写入 target（设置里的 cookies 路径）并保存到配置
+async function importCookies(target) {
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: '选择 cookies.txt',
+    properties: ['openFile'],
+    filters: [{ name: 'Cookies', extensions: ['txt'] }, { name: '所有文件', extensions: ['*'] }],
+  })
+  if (r.canceled) return null
+  const src = r.filePaths[0]
+  if (fs.statSync(src).size > 20 * 1048576) return { error: '文件过大，不像是 cookies.txt' }
+  let text = fs.readFileSync(src, 'utf8').replace(/\r\n?/g, '\n')
+  if (/^\s*[[{]/.test(text)) return { error: '这是 JSON 格式，yt-dlp 需要 Netscape 格式的 cookies.txt' }
+  const info = inspectCookies(text)
+  if (!info.count) return { error: '未识别到有效 cookie，请确认是 Netscape 格式的 cookies.txt' }
+  // yt-dlp 要求首行是 Netscape 文件头，部分导出工具不带，这里补上
+  if (!/^#( Netscape)? HTTP Cookie File/.test(text)) text = '# Netscape HTTP Cookie File\n' + text
+
+  const dest = expandHome((target || '').trim()) || DEFAULT_COOKIES
+  try {
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    // 先写临时文件再改名，避免写到一半时正好有下载任务在读
+    const tmp = `${dest}.${process.pid}.tmp`
+    fs.writeFileSync(tmp, text, { mode: 0o600 })
+    fs.renameSync(tmp, dest)
+  } catch (e) {
+    return { error: `写入失败：${e.message}` }
+  }
+  saveConfig({ ...loadConfig(), cookies: dest })
+  return { path: dest, ...info }
+}
+
+// 从 Dock/Finder 启动时 PATH 只有系统目录，yt-dlp 会找不到 deno/node（YouTube JS 验证、PO Token 插件）
+// 和 ffmpeg（合并音视频），这里统一补上 Homebrew 目录
+const SPAWN_ENV = {
+  ...process.env,
+  PATH: ['/opt/homebrew/bin', '/usr/local/bin', process.env.PATH].filter(Boolean).join(':'),
+}
+
 // yt-dlp 路径：优先 Homebrew（Apple Silicon / Intel），否则走 PATH
 function ytdlpBin() {
   for (const p of ['/opt/homebrew/bin/yt-dlp', '/usr/local/bin/yt-dlp']) {
@@ -37,7 +108,10 @@ function ytdlpBin() {
 }
 
 // ---------- URL 提取（从分享文案解析） ----------
-const _TAIL = String.raw`[^\s\u4e00-\u9fff，。；：！？、""''（）【】《》〈〉,.!?;:)]`
+// URL 内部允许 ? & = . : 等 ASCII 字符（否则 watch?v=xxx 会在 ? 处被截断），
+// 只在空白、中文、全角标点、引号和括号处结束；句末的 ASCII 标点由 _TRAILING_PUNCT 去掉
+const _TAIL = String.raw`[^\s\u4e00-\u9fff，。；：！？、“”‘’"'（）【】《》〈〉]`
+const _TRAILING_PUNCT = /[，。；：“”‘’"'（）【】,.!?;:)]+$/
 const URL_PATTERNS = [
   String.raw`https?://(?:v\.douyin\.com|www\.douyin\.com|www\.iesdouyin\.com|m\.douyin\.com)/` + _TAIL + '+',
   String.raw`https?://(?:www\.)?tiktok\.com/` + _TAIL + '+',
@@ -53,10 +127,10 @@ function extractUrl(text) {
   text = text.trim()
   for (const p of URL_PATTERNS) {
     const m = text.match(new RegExp(p, 'i'))
-    if (m) return m[0].replace(/[，。；：""''（）【】,.!?;:)]+$/, '')
+    if (m) return m[0].replace(_TRAILING_PUNCT, '')
   }
   const m = text.match(/https?:\/\/[^\s]+/)
-  if (m) return m[0].replace(/[，。；：""''（）【】,.!?;:)]+$/, '')
+  if (m) return m[0].replace(_TRAILING_PUNCT, '')
   return null
 }
 
@@ -161,6 +235,17 @@ async function downloadDouyinTask(taskId, url, outdir) {
   emit(taskId, { status: 'done', progress: 100, message: '完成', filePath, size: fs.statSync(filePath).size })
 }
 
+// 从 yt-dlp 的 stderr 中取最后一条 ERROR，并对常见错误给出中文提示
+function ytdlpErrorMessage(stderr) {
+  const errors = stderr.split('\n').map(s => s.trim()).filter(s => s.startsWith('ERROR:'))
+  const last = errors[errors.length - 1]
+  if (!last) return ''
+  if (last.includes('confirm you’re not a bot') || last.includes("confirm you're not a bot")) {
+    return 'YouTube 要求登录验证：cookies 缺失或已失效，请重新导出 YouTube cookies 后再试'
+  }
+  return last.slice(0, 200)
+}
+
 function downloadYtdlpTask(taskId, url, outdir, cookies) {
   return new Promise((resolve, reject) => {
     const ytdlp = ytdlpBin()
@@ -170,7 +255,7 @@ function downloadYtdlpTask(taskId, url, outdir, cookies) {
     if (cookies && fs.existsSync(cookies)) args.push('--cookies', cookies)
     args.push(url)
     emit(taskId, { status: 'downloading', progress: 0, message: '开始下载' })
-    const child = spawn(ytdlp, args)
+    const child = spawn(ytdlp, args, { env: SPAWN_ENV })
     child.on('error', (e) => reject(new Error(`无法启动 yt-dlp（${e.message}），请先安装：brew install yt-dlp`)))
     let lastLine = ''
     child.stdout.on('data', (data) => {
@@ -184,9 +269,12 @@ function downloadYtdlpTask(taskId, url, outdir, cookies) {
         else if (s.includes('Destination')) emit(taskId, { message: s.slice(0, 80) })
       }
     })
+    // yt-dlp 的 ERROR 写在 stderr，必须单独收集，否则只能拿到最后一行进度日志
+    let stderr = ''
+    child.stderr.on('data', (data) => { stderr += data.toString() })
     child.on('close', (code) => {
       if (code === 0) { emit(taskId, { status: 'done', progress: 100, message: '完成' }); resolve() }
-      else reject(new Error(lastLine || '下载失败'))
+      else reject(new Error(ytdlpErrorMessage(stderr) || lastLine || '下载失败'))
     })
   })
 }
@@ -245,7 +333,7 @@ function registerIpcHandlers() {
     }
     return new Promise((resolve) => {
       const fallback = { platform, title: url, thumbnail: '', uploader: '', duration: 0 }
-      const child = spawn(ytdlpBin(), ['--ignore-config', '--no-warnings', '--dump-json', '--no-playlist', url])
+      const child = spawn(ytdlpBin(), ['--ignore-config', '--no-warnings', '--dump-json', '--no-playlist', url], { env: SPAWN_ENV })
       child.on('error', () => resolve(fallback))
       let out = ''
       child.stdout.on('data', (d) => { out += d.toString() })
@@ -278,6 +366,8 @@ function registerIpcHandlers() {
   ipcMain.handle('shell:open', (_e, url) => {
     if (/^https?:\/\//i.test(String(url))) return shell.openExternal(url)
   })
+  ipcMain.handle('cookies:import', (_e, target) => importCookies(target))
+  ipcMain.handle('cookies:info', (_e, target) => cookiesInfo(target))
   ipcMain.handle('dialog:selectFile', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openFile'] })
     return r.canceled ? null : r.filePaths[0]

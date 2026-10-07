@@ -40,7 +40,7 @@ APPDIR="$BUILD/${APP_NAME}.app/Contents/Resources/app"
 mkdir -p "$APPDIR"
 cp main.js preload.js "$APPDIR/"
 cp -R renderer "$APPDIR/"
-printf '{"name":"vget","version":"1.0.0","main":"main.js"}\n' > "$APPDIR/package.json"
+printf '{"name":"vget","version":"1.1.0","main":"main.js"}\n' > "$APPDIR/package.json"
 
 codesign --force --sign - "$BUILD/${APP_NAME}.app" >/dev/null 2>&1
 

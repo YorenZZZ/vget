@@ -103,6 +103,8 @@ npm start
 
 - **输出目录**：默认 `~/Downloads`
 - **Cookies 文件**：默认 `~/Library/Application Support/vget/cookies.txt`
+  - 点旁边的 **更新 Cookies** 选择新导出的 cookies.txt，会校验格式后覆盖到该路径并自动保存
+  - 下方提示会显示 cookie 条数，以及是否包含 YouTube 登录信息（绿色正常，红色说明缺失或已失效）
 
 配置保存在 `~/Library/Application Support/vget/config.json`。
 
@@ -135,6 +137,8 @@ B站/YouTube/TikTok 通常需要登录态。任选一种方式导出 Netscape �
   ```bash
   yt-dlp --cookies-from-browser chrome --cookies cookies.txt --skip-download "https://www.youtube.com"
   ```
+
+**YouTube 建议用无痕窗口导出**：在无痕窗口登录 YouTube，导出 cookies.txt 后立即关闭该窗口、不要再用它浏览。YouTube 会频繁轮换普通窗口的 cookies，导出的那份很快就会失效。导出后在 VGET 设置里点 **更新 Cookies** 上传即可。
 
 > ⚠️ **cookies.txt 等同于你的账号登录凭据。** 不要分享、不要提交到 Git（本仓库的 `.gitignore` 已排除它）。
 
@@ -169,6 +173,10 @@ curl -fsSL https://raw.githubusercontent.com/YorenZZZ/vget/main/install.sh | bas
 ```
 
 **下载的 B站/YouTube 视频没有声音或是分开的两个文件？** 安装 ffmpeg 以便 yt-dlp 合并音视频。
+
+**YouTube 提示「要求登录验证」（Sign in to confirm you're not a bot）？** cookies 缺失或已失效。按上文用无痕窗口重新导出，在设置里点 **更新 Cookies** 上传，等提示变绿后重试。也可以换一个代理节点，部分 IP 会被 YouTube 要求验证。
+
+**YouTube 下载到一半失败（`bytes read, … more expected`），或只能下载 360p？** YouTube 对部分账号要求 PO Token。安装 PO Token 插件 [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider)（按其 README 安装插件并构建 provider），yt-dlp 会自动调用，VGET 无需额外设置。详见 [yt-dlp PO Token Guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide)。
 
 ## 免责声明
 

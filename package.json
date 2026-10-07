@@ -1,6 +1,6 @@
 {
   "name": "vget",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "全平台无水印视频下载工具（抖音/B站/YouTube/TikTok）",
   "main": "main.js",
   "scripts": {

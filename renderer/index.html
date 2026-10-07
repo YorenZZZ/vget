@@ -173,6 +173,13 @@
     border: 1px solid var(--outline-variant); border-radius: 8px; padding: 9px 10px; font-size: 13px; outline: none; }
   .modal input:focus { border-color: var(--primary); }
   .modal .btn-row { justify-content: flex-end; }
+  .field-row { display: flex; gap: 8px; margin-top: 4px; }
+  .field-row input { flex: 1; min-width: 0; }
+  .field-row .btn { flex: none; height: auto; font-size: 13px; padding: 0 12px; white-space: nowrap; }
+  .field-row .btn .material-symbols-outlined { font-size: 18px; }
+  .field-hint { font-size: 11px; color: var(--outline); margin-top: 6px; }
+  .field-hint.ok { color: var(--success); }
+  .field-hint.warn { color: var(--error); }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     background: var(--surface-container-highest); border: 1px solid var(--outline-variant);
     padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .3s; z-index: 100; }
@@ -262,7 +269,14 @@
     </div>
     <div>
       <label>Cookies 文件（B站/YouTube/TikTok 用）</label>
-      <input id="cfgCookiesInput" placeholder="~/Downloads/cookies.txt">
+      <div class="field-row">
+        <input id="cfgCookiesInput" placeholder="~/Downloads/cookies.txt">
+        <button class="btn btn-ghost" id="btnImportCookies" title="选择新的 cookies.txt，覆盖到上面的路径">
+          <span class="material-symbols-outlined">upload_file</span>
+          <span>更新 Cookies</span>
+        </button>
+      </div>
+      <div class="field-hint" id="cookiesHint"></div>
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" id="btnCancel" style="flex:1">取消</button>
@@ -428,9 +442,49 @@ function loadConfig() {
   window.vget.getConfig().then(d => {
     $('cfgOutdirInput').value = d.outdir;
     $('cfgCookiesInput').value = d.cookies;
+    refreshCookiesHint();
   });
 }
-$('btnSettings').addEventListener('click', () => $('modalOverlay').classList.add('show'));
+
+function showCookiesHint(info) {
+  const hint = $('cookiesHint');
+  if (!info.exists) {
+    hint.className = 'field-hint warn';
+    hint.textContent = '文件不存在，点「更新 Cookies」选择一个 cookies.txt';
+  } else if (info.youtubeLogin) {
+    hint.className = 'field-hint ok';
+    hint.textContent = `共 ${info.count} 条 cookie，已包含 YouTube 登录信息`;
+  } else {
+    hint.className = 'field-hint warn';
+    hint.textContent = `共 ${info.count} 条 cookie，未检测到 YouTube 登录信息，YouTube 可能要求验证`;
+  }
+}
+async function refreshCookiesHint() {
+  showCookiesHint(await window.vget.cookiesInfo($('cfgCookiesInput').value));
+}
+
+$('btnImportCookies').addEventListener('click', async () => {
+  const btn = $('btnImportCookies');
+  btn.disabled = true;
+  try {
+    const r = await window.vget.importCookies($('cfgCookiesInput').value);
+    if (!r) return; // 取消选择
+    if (r.error) { toast(r.error); return; }
+    $('cfgCookiesInput').value = r.path;
+    showCookiesHint({ exists: true, ...r });
+    toast(r.youtubeLogin ? 'Cookies 已更新' : 'Cookies 已更新，但未检测到 YouTube 登录信息');
+  } catch (e) {
+    toast('更新失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+$('cfgCookiesInput').addEventListener('change', refreshCookiesHint);
+
+$('btnSettings').addEventListener('click', () => {
+  $('modalOverlay').classList.add('show');
+  refreshCookiesHint();
+});
 $('btnCancel').addEventListener('click', () => $('modalOverlay').classList.remove('show'));
 $('modalOverlay').addEventListener('click', (e) => { if (e.target === $('modalOverlay')) $('modalOverlay').classList.remove('show'); });
 $('btnSave').addEventListener('click', async () => {
